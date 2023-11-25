@@ -1,3 +1,3 @@
 # s7-miniproj
 
-# Added: Device enrollment
+##  Added: Device enrollment
