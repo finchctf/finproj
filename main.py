@@ -16,6 +16,7 @@ RA = PUFA(CA)
 RAV = PUFA(CAV)
 
 sAV = (CA + 2 * RandA) % p
+## sA = CA + RandA mod p
 sA = (CA + 2 * RandA) % p
 
 def H(data):
