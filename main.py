@@ -1,89 +1,47 @@
-import hashlib
-import random
+p = 89725685850239958443238402010853908314824152174340982259070258737678950396973
 
-# p, randA
-p = 1606938044258990275541962092341162602522202993782792835301376
-RandA = random.randint(1, p - 1)
+def device_enrollment():
 
-CA = random.randint(1, p - 1)
-CAV = random.randint(1, p - 1)
+    from util import Verifier,Device
 
-# PUF
-def PUFA(challenge):
-    return (challenge + RandA) % p
+    global verifier,devices,p
 
-RA = PUFA(CA)
-RAV = PUFA(CAV)
+    # Verifier
+    verifier = Verifier(p,"V1")
+    [verifier.add_client(i) for i in "A B".split()]
 
-sAV = (CA + 2 * RandA) % p
-## sA = CA + RandA mod p
-sA = (CA + 2 * RandA) % p
+    # Device
+    devices = {i:Device(p, *verifier.generate_challenge(i), i) for i in "A B".split()}
 
-def H(data):
-    return hashlib.sha256(str(data).encode()).hexdigest()
+    # Verifier
+    [verifier.update_Rvals(i,*devices[i].get_RX_V()) for i in "A B".split()]
 
-hrA = H(RA)
-hcA = H(CA)
+    # Device
+    [devices[i].store_vVals(*verifier.get_HC_S_X(i)) for i in "A B".split()]
 
-IDA = "DeviceA"  
+    # Verifier
+    print("Verifier")
+    print(str(verifier.data["A"]))
+    print(str(verifier.data["B"]))
 
-KAV = RAV
+    # Device - TODO: Improve the output representation
+    print("Devices")
+    print(str(devices["A"].data))
+    print(str(devices["B"].data))
 
-message_to_deviceA = (IDA, sA, hcA, CAV)
+def device_device_ake():
+    
+    # Device A -> Device B
+    temp_keys_A=devices["A"].gen_tempo_keys("B","V1")
 
-device_informationA = (IDA, sA, hcA, CAV)
+    temp_keys_V=verifier.update_tempo_keys_and_gen("A",*temp_keys_A,"B","V1")
 
-verifier_informationA = (IDA, sAV, hrA, KAV)
+    sig1=devices["A"].verify_and_gen_session_key(*temp_keys_V[0])
 
-
-print("DeviceA Information:", device_informationA)
-print("Verifier Information:", verifier_informationA)
-
-NA = random.randint(1, 100000) 
-
-RandB = random.randint(1, p - 1)
+    sig2=devices["B"].verify_and_gen_session_key(*temp_keys_V[1],False)
 
 
-CB = random.randint(1, p - 1)
-CBV = random.randint(1, p - 1)
 
 
-def PUFB(challenge):
-    return (challenge + RandB) % p
 
-RB = PUFB(CB)
-RBV = PUFB(CBV)
 
-sBV = (CB + 2 * RandB) % p
-sB = (CB + 2 * RandB) % p
-
-def H(data):
-    return hashlib.sha256(str(data).encode()).hexdigest()
-
-hrB = H(RB)
-hcB = H(CB)
-
-IDB = "DeviceB" 
-
-KBV = RBV
-
-message_to_deviceB = (IDB, sB, hcB, CBV)
-
-device_informationB = (IDB, sB, hcB, CBV)
-
-verifier_informationB = (IDB, sBV, hrB, KBV)
-
-print("DeviceB Information:", device_informationB)
-print("Verifier Information:", verifier_informationB)
-
-KAV = PUFA(CAV)
-
-hkAV = H(KAV + str(NA).encode()).hexdigest()
-
-TDA = H(IDA + hkAV)
-TDV = H("IDV" + hkAV) 
-TDB = H(IDB + hkAV)
-
-SGAV = H(TDA + TDV + TDB + str(NA).encode() + KAV)
-
-message_to_verifier = (TDA, TDV, TDB, NA, SGAV)
