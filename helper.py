@@ -18,3 +18,6 @@ def hashIT(x: bytes) -> str:
 def hashIT(x: int) -> str:
     from hashlib import sha1
     return sha1(x.to_bytes(x.bit_length()//8+1,'big')).hexdigest()
+
+def xor(a,b):
+    return b''.join([bytes([i^j]) for i,j in zip(a,b)])
