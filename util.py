@@ -79,6 +79,7 @@ class Verifier:
 
     def generate_challenge(self,client: str):
         assert client in self.client
+        #two seeds
         C_X, C_XV = [self.puff._genRand() for _ in range(2)]
         data = vStore(ID_X=client,C_X=C_X,C_XV=C_XV)
         self.data[client] = data
@@ -173,21 +174,25 @@ class Device:
         return self.TD_X,self.TD_V,self.TD_pair,self.nonceX,self.Sig_X_V
 
     def verify_and_gen_session_key(self,TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag=True):
-        self._verify_tempo_keys(TD_V,TD_X,D_X,R_p,nonceV,SG_V_X)
+        self._verify_tempo_keys(TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag)
         return self._gen_session_keys(D_X,nonceV,R_p,flag=True)
     
-    def _verify_tempo_keys(self,TD_V,TD_X,D_X,R_p,nonceV,SG_V_X):
+    def _verify_tempo_keys(self,TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag=True):
         import hashlib,time
         nonceVX = float(nonceV)
         try:
             assert float(time.time()) - nonceVX < 60*5
         except AssertionError:
             raise Exception("Nonce Not Fresh")
-        try:
-            assert self.TD_X == TD_X
-        except AssertionError:
-            raise Exception("TD_X Verification Failed")
-        SG_V_X_ = hashlib.sha256(self.TD_V+self.TD_X+D_X+R_p+nonceV+self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')).digest()
+        if flag:
+            try:
+                assert self.TD_X == TD_X
+            except AssertionError:
+                raise Exception("TD_X Verification Failed")
+        else:
+            self.K_XV = self.R_XV
+            self.hk_XV = hashlib.sha256(self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')+nonceV).digest()
+        SG_V_X_ = hashlib.sha256(TD_V+TD_X+D_X+R_p+nonceV+self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')).digest()
         try:
             assert SG_V_X == SG_V_X_
         except AssertionError:
@@ -196,7 +201,7 @@ class Device:
     def _gen_session_keys(self,D_X,nonceV,R_p,flag=True):
         import hashlib
         S_XV = int.from_bytes(xor(D_X,self.hk_XV),'big')
-        print(S_XV,self.data.S_X)
+        #print(S_XV,self.data.S_X)
         C_X = (S_XV-2*self.data.S_X) % self.p
         H_C_X = hashlib.sha256(C_X.to_bytes((C_X.bit_length()+7)//8,'big')).digest()
         try:

@@ -10,7 +10,7 @@ def device_enrollment():
     verifier = Verifier(p,"V1")
     [verifier.add_client(i) for i in "A B".split()]
 
-    # Device
+    # Device add seeds
     devices = {i:Device(p, *verifier.generate_challenge(i), i) for i in "A B".split()}
 
     # Verifier
@@ -33,12 +33,15 @@ def device_device_ake():
     
     # Device A -> Device B
     temp_keys_A=devices["A"].gen_tempo_keys("B","V1")
+    #temp_keys_B=devices["B"].gen_tempo_keys("A","V1")
 
     temp_keys_V=verifier.update_tempo_keys_and_gen("A",*temp_keys_A,"B","V1")
 
-    sig1=devices["A"].verify_and_gen_session_key(*temp_keys_V[0])
 
-    sig2=devices["B"].verify_and_gen_session_key(*temp_keys_V[1],False)
+    s1=devices["A"].verify_and_gen_session_key(*temp_keys_V[0])
+
+    s2=devices["B"].verify_and_gen_session_key(*temp_keys_V[1],False)
+    print(s1.hex(),s2.hex())
 
 
 
