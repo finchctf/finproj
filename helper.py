@@ -10,3 +10,7 @@ class PUFF:
         import random
         random.seed(challenge)
         return random.randint(2,self.P-1)
+
+
+def xor(a,b):
+    return b''.join([bytes([i^j]) for i,j in zip(a,b)])

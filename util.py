@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import NamedTuple
 
-def xor(a,b):
-    return b''.join([bytes([i^j]) for i,j in zip(a,b)])
-
+from helper import PUFF,xor,getRand
 
 @dataclass
 class vStore:
@@ -50,21 +48,6 @@ class dStore:
         HC_{self.ID_X}: {self.HC_X}
         C_{self.ID_X}V: {self.C_XV}"""
 
-class PUFF:
-    def __init__(self,P):
-        self.P = P
-        self.genRand()
-
-    def __call__(self,challenge):
-        return (challenge + self.PUF_R) % self.P
-
-    def _genRand(self):
-        from os import urandom
-        return int.from_bytes(urandom(self.P.bit_length()//8-1),'big')
-
-    def genRand(self):
-        self.PUF_R = self._genRand()
-        return self.PUF_R
 
 class Verifier:
     def __init__(self,p: int, id: str):
@@ -80,24 +63,26 @@ class Verifier:
     def generate_challenge(self,client: str):
         assert client in self.client
         #two seeds
-        C_X, C_XV = [self.puff._genRand() for _ in range(2)]
-        data = vStore(ID_X=client,C_X=C_X,C_XV=C_XV)
+        C_X, C_XV = [getRand(self.p) for _ in range(2)]
+        data = vStore(ID_X=client)
+        self.C_X, self.C_XV = C_X, C_XV
         self.data[client] = data
         return C_X,C_XV
     
     def update_Rvals(self,client: str,R_X,R_XV):
         assert client in self.client
-        data = self.data[client]
-        data.R_X, data.R_XV = R_X, R_XV
-        self.data[client] = data
+        # data = self.data[client]
+        self.R_X, self.R_XV = R_X, R_XV
+        # self.data[client] = data
         self.generate_shares(client)
 
     def generate_shares(self,client: str):
         import hashlib
         assert client in self.client
         data = self.data[client]
-        s_XV = (data.C_X + 2 * data.R_X) % self.p
-        s_X = (data.C_X + data.R_X) % self.p
+        R_AND = getRand(self.p)
+        s_XV = (data.C_X + 2 * R_AND) % self.p
+        s_X = (data.C_X + R_AND) % self.p
         hr_X = hashlib.sha256(data.R_X.to_bytes((data.R_X.bit_length()+7)//8,'big')).digest()
         hc_X = hashlib.sha256(data.C_X.to_bytes((data.C_X.bit_length()+7)//8,'big')).digest()
         K_XV = data.R_XV
