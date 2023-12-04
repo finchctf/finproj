@@ -2,46 +2,60 @@ p = 8972568585023995844323840201085390831482415217434098225907025873767895039697
 
 def device_enrollment():
 
-    from util import Verifier,Device
+    from verifier import Verifier
+    from client import Device
 
-    global verifier,devices,p
+    global verifier,dA,dB,p
 
     # Verifier
     verifier = Verifier(p,"V1")
-    [verifier.add_client(i) for i in "A B".split()]
-
-    # Device add seeds
-    devices = {i:Device(p, *verifier.generate_challenge(i), i) for i in "A B".split()}
-
-    # Verifier
-    [verifier.update_Rvals(i,*devices[i].get_RX_V()) for i in "A B".split()]
-
-    # Device
-    [devices[i].store_vVals(*verifier.get_HC_S_X(i)) for i in "A B".split()]
+    verifier.verifier_enroll.add_client("A")
+    
+    # Device A
+    dA = Device(p,"A")
+    dA.device_enroll.get_CX_CXV(*verifier.verifier_enroll.generate_challenge("A"))
 
     # Verifier
-    print("Verifier")
+    verifier.verifier_enroll.update_Rvals("A",*dA.device_enroll.get_RX_RXV())
+
+    # Device A
+    dA.device_enroll.store_vVals(*verifier.verifier_enroll.generate_shares("A"))
+
     print(str(verifier.data["A"]))
-    print(str(verifier.data["B"]))
+    print(str(dA.data))
 
-    # Device - TODO: Improve the output representation
-    print("Devices")
-    print(str(devices["A"].data))
-    print(str(devices["B"].data))
+    # Verifier
+    verifier.verifier_enroll.add_client("B")
+
+    # Device B
+    dB = Device(p,"B")
+    dB.device_enroll.get_CX_CXV(*verifier.verifier_enroll.generate_challenge("B"))
+
+    # Verifier
+    verifier.verifier_enroll.update_Rvals("B",*dB.device_enroll.get_RX_RXV())
+
+    # Device B
+    dB.device_enroll.store_vVals(*verifier.verifier_enroll.generate_shares("B"))
+
+    print(str(verifier.data["B"]))
+    print(str(dB.data))
 
 def device_device_ake():
     
     # Device A -> Device B
-    temp_keys_A=devices["A"].gen_tempo_keys("B","V1")
+    temp_keys_A=dA.device_dd_ake.gen_tempo_keys("B","V1")
     #temp_keys_B=devices["B"].gen_tempo_keys("A","V1")
 
-    temp_keys_V=verifier.update_tempo_keys_and_gen("A",*temp_keys_A,"B","V1")
+    temp_keys_V=verifier.verifier_dd_ake.update_tempo_keys_and_gen("A",*temp_keys_A,"B","V1")
+    #print(temp_keys_V)
 
+    print(dA.device_dd_ake.verify_and_gen_session_key(*temp_keys_V[0]))
+    print(dB.device_dd_ake.verify_and_gen_session_key(*temp_keys_V[1],False))
 
-    s1=devices["A"].verify_and_gen_session_key(*temp_keys_V[0])
+    # s1=devices["A"].verify_and_gen_session_key(*temp_keys_V[0])
 
-    s2=devices["B"].verify_and_gen_session_key(*temp_keys_V[1],False)
-    print(s1.hex(),s2.hex())
+    # s2=devices["B"].verify_and_gen_session_key(*temp_keys_V[1],False)
+    # print(s1.hex(),s2.hex())
 
 
 
