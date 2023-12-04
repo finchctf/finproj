@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from helper import PUFF,xor,getRand
+from helper import PUFF,xor,getRand,hashIT
 
 @dataclass
 class vStore:
@@ -83,10 +83,10 @@ class Verifier:
         R_AND = getRand(self.p)
         s_XV = (data.C_X + 2 * R_AND) % self.p
         s_X = (data.C_X + R_AND) % self.p
-        hr_X = hashlib.sha256(data.R_X.to_bytes((data.R_X.bit_length()+7)//8,'big')).digest()
-        hc_X = hashlib.sha256(data.C_X.to_bytes((data.C_X.bit_length()+7)//8,'big')).digest()
-        K_XV = data.R_XV
-        data.S_XV, data.S_X, data.HR_X, data.HC_X, data.K_XV = s_XV, s_X, hr_X, hc_X, K_XV
+        hr_X = hashIT(self.R_X)
+        hc_X = hashIT(self.C_X)
+        data.K_XV = self.R_XV
+        # data.S_XV, data.S_X, data.HR_X, data.HC_X, data.K_XV = s_XV, s_X, hr_X, hc_X, K_XV
 
     def get_HC_S_X(self,client: str):
         assert client in self.client
