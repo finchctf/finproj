@@ -10,3 +10,11 @@ class PUFF:
         import random
         random.seed(challenge)
         return random.randint(2,self.P-1)
+
+def hashIT(x: bytes) -> str:
+    from hashlib import sha1
+    return sha1(x).hexdigest()
+
+def hashIT(x: int) -> str:
+    from hashlib import sha1
+    return sha1(x.to_bytes(x.bit_length()//8+1,'big')).hexdigest()
