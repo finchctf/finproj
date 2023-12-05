@@ -91,7 +91,55 @@ class Device_DV_AKE():
         TD_V = hashIT(verifier_id.encode(),hk_XV)
         Sig_X_V = hashIT(TD_X+TD_V+nonceX,K_XV)
         return TD_X,TD_V,nonceX,Sig_X_V
+    
+    def verify_and_gen_session_key(self,TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X):
+        self._verify_tempo_keys(TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X)
+        return self._gen_session_keys(P_XV, P_X , Cl , N_V)
 
+    def _verify_tempo_keys(self,TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X):
+        nonceVX = float(N_V)
+        try:
+            assert float(calcNonce()) - nonceVX < 60*5
+        except AssertionError:
+            raise Exception("Nonce Not Fresh")
+        K_XV = self.puff(self.data.C_XV)
+        SG_V_X_ = hashIT(TD_V,TD_X,P_XV, P_X , Cl , N_V,K_XV)
+        try:
+            assert SG_V_X == SG_V_X_
+        except AssertionError:
+            raise Exception("Signature Verification Failed")
+        
+    def _gen_session_keys(self,client ,P_XV, P_X , Cl , N_V):
+        S_XV = xor(P_XV , self.hk_XV)
+        C_X = (S_XV + 2*self.data.S_X) % self.p
+        H_C_X = hashIT(C_X)
+        try:
+            assert H_C_X == self.data.HC_X
+        except AssertionError:
+            raise Exception("HC_X Verification Failed")
+        
+        R_X = self.puff(C_X)
+        hr_X = hashIT(R_X)
+        C_X_new = xor(xor(Cl, self.hk_XV), hr_X)
+        R_X_new = self.puff(C_X_new)
+        S_X_new  = xor(P_X , self.hk_XV)
+        hk_XV_new = hashIT(self.K_XV, N_V)
+        hr_X_new = hashIT(R_X_new)
+        V1 = xor(R_X , self.hk_XV)
+        V2 = xor(hr_X_new ,self.hk_XV)
+        TD_X = hashIT(self.id,self.hk_XV)
+        TD_V = hashIT(self.verifier_id,self.hk_XV)
+        SG_XV = hashIT(TD_X,TD_V, N_V,V1,V2 , self.K_XV)
+        K_S = xor(hr_X , hr_X_new)
+        S_X = S_X_new
+        self.data[client].C_XV = C_X
+        N_X_new  = calcNonce()
+        self.data[client].S_X = S_X_new
+        self.data[client].HC_X = hashIT(C_X_new)
+        return ( TD_X, TD_V , V1 , V2, N_X_new ,SG_XV)
+
+
+        
 
 
 class Device():
