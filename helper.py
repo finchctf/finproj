@@ -23,6 +23,22 @@ class vStoreContainer:
     def __setitem__(self,client,vStore):
         self.data[client] = vStore
 
+    def __delitem__(self,client):
+        del self.data[client]
+
+    def __contains__(self,client):
+        return client in self.data
+    
+    def __str__(self) -> str:
+        return str(self.data)
+    
+    def __len__(self) -> int:
+        return len(self.data)
+    
+    def __iter__(self):
+        return iter(self.data)
+    
+
 @dataclass
 class dStore:
     ID_X: str = None
