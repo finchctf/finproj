@@ -97,7 +97,6 @@ class Device_DV_AKE():
 class Device():
     def __init__(self, p: int, id: str):
         self.device_enroll = Device_enroll(p,id)
-        self.data = self.device_enroll.data
         self.device_dd_ake = Device_DD_AKE(p,id,self.data)
         self.device_dv_ake = Device_DV_AKE(p,id,self.data)
 

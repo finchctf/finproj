@@ -1,17 +1,16 @@
 from helper import *
 
 class Verifier_enroll:
-    def __init__(self,p:int,id:str,client:list,data:vStoreContainer):
+    def __init__(self,p:int,id:str,data:vStoreContainer):
         self.id = id
         self.p = p
-        self.client = client
         self.data = data
     
     def add_client(self,client: str):
-        self.client.append(client)
+        self.data[client] = vStore(ID_X=client)
 
     def generate_challenge(self,client: str):
-        assert client in self.client
+        assert client in self.data
         #two seeds
         C_X, C_XV = [getRand(self.p) for _ in range(2)]
         data = vStore(ID_X=client)
@@ -20,13 +19,13 @@ class Verifier_enroll:
         return C_X,C_XV
     
     def update_Rvals(self,client: str,R_X,R_XV):
-        assert client in self.client
+        assert client in self.data
         # data = self.data[client]
         self.R_X, self.R_XV = R_X, R_XV
         # self.data[client] = data
 
     def generate_shares(self,client: str):
-        assert client in self.client
+        assert client in self.data
         R_AND = getRand(self.p)
         s_XV = (self.C_X + 2 * R_AND) % self.p
         s_X = (self.C_X + R_AND) % self.p
@@ -79,9 +78,8 @@ class Verifier_DD_AKE():
         return (TD_V,TD_X,D_X,R_p,self.N_V,SG_V_X),(TD_V,TD_pair,D_Y,R_p,self.N_V,SG_V_Y)
 
 class Verifier_DV_AKE():
-    def __init__(self,data,client,p):
+    def __init__(self,data,p):
         self.data = data
-        self.client= client
         self.p=p
 
     def update_tempo_keys_and_gen(self,client,TD_X,TD_V,n_X,Sig_X_V,verifier_id):
@@ -103,13 +101,13 @@ class Verifier_DV_AKE():
             raise Exception("Signature Verification Failed")
 
     def generate_challenge(self,client: str):
-        assert client in self.client
+        assert client in self.data
         #one seed
         C_X_new = getRand(self.p)
         self.C_X_new = C_X_new 
 
     def generate_shares(self,client: str,TD_V:bytes):
-        assert client in self.client
+        assert client in self.data
         R_AND_new = getRand(self.p)
         s_XV_new = (self.C_X_new + 2 * R_AND_new) % self.p
         s_X_new = (self.C_X_new + R_AND_new) % self.p
@@ -136,13 +134,10 @@ class Verifier():
     def __init__(self,p: int, id: str):
         self.p = p
         self.id = id
-        self.client = []
         self.data = vStoreContainer()
-        self.verifier_enroll = Verifier_enroll(p,id,self.client,self.data)
-        self.data = self.verifier_enroll.data
-        self.client = self.verifier_enroll.client
+        self.verifier_enroll = Verifier_enroll(p,id,self.data)
         self.verifier_dd_ake = Verifier_DD_AKE(self.data)
-        self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.client,self.p)
+        self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.p)
 
 
 
