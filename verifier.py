@@ -78,14 +78,15 @@ class Verifier_DD_AKE():
         return (TD_V,TD_X,D_X,R_p,self.N_V,SG_V_X),(TD_V,TD_pair,D_Y,R_p,self.N_V,SG_V_Y)
 
 class Verifier_DV_AKE():
-    def __init__(self,data,p):
+    def __init__(self,data,p,id):
         self.data = data
         self.p=p
+        self.id = id
 
-    def update_tempo_keys_and_gen(self,client,TD_X,TD_V,n_X,Sig_X_V,verifier_id):
+    def update_tempo_identity_and_gen(self,client,TD_X,TD_V,n_X,Sig_X_V,verifier_id):
         self._update_tempo_keys(client,TD_X,TD_V,n_X,Sig_X_V)
         self.generate_challenge(client)
-        return self.generate_shares(client,TD_V)
+        return self.generate_shares(client)
 
     def _update_tempo_keys(self,client,TD_X,TD_V,n_X,Sig_X_V):
         data = self.data[client]
@@ -106,7 +107,7 @@ class Verifier_DV_AKE():
         C_X_new = getRand(self.p)
         self.C_X_new = C_X_new 
 
-    def generate_shares(self,client: str,TD_V:bytes):
+    def generate_shares(self,client: str):
         assert client in self.data
         R_AND_new = getRand(self.p)
         s_XV_new = (self.C_X_new + 2 * R_AND_new) % self.p
@@ -115,39 +116,53 @@ class Verifier_DV_AKE():
         nonceV = calcNonce()
         # generate hk_XC
         hk_XV = hashIT(self.data[client].K_XV,nonceV)
+        
         # retrieves hr_A
         hr_X = self.data[client].HR_X
         # generate P_XV =S_XV xor hk_XC
-        P_XV = s_XV_new ^ int.from_bytes(hk_XV,'big')
+        s_XV_b = self.data[client].S_XV.to_bytes(self.data[client].S_XV.bit_length()//8+1,'big')
+        s_XV_new_b = s_XV_new.to_bytes(s_XV_new.bit_length()//8+1,'big')
+        #print("+",s_XV_b , hk_XV)
+        P_XV = xor(s_XV_b , hk_XV)
+
+        #print("+",self.data[client].S_XV,P_XV,hk_XV,sep="\n")
+
         # generate P_X =S_X_NEW xor hk_XC
-        P_X = s_X_new ^ int.from_bytes(hk_XV,'big')
+        P_X = xor(s_XV_new_b ,hk_XV)
         # Cl = C_X_new xor hk_XC xor hr_X
         Cl = self.C_X_new ^ int.from_bytes(hk_XV,'big') ^ int.from_bytes(hr_X,'big')
         TD_X = hashIT(client.encode(),hk_XV)
-        SG_XV = hashIT(TD_V,TD_X,nonceV,P_XV,P_X,Cl,self.data[client].K_XV)
-        return (TD_V,TD_X,nonceV,Cl,SG_XV)
+        TD_V = hashIT(self.id.encode(),hk_XV)
+        SG_XV = hashIT(TD_V,TD_X,P_XV,P_X,Cl,nonceV,self.data[client].K_XV)
+        #print("+",TD_V,TD_X,P_XV,P_X,Cl,nonceV,self.data[client].K_XV,sep="\n")
+        return TD_V,TD_X,P_XV,P_X,Cl, nonceV, SG_XV
     
-    def verify_and_gen_session_key(self,client,TD_X,TD_V,nonceV,V1,V2 , N_X,SG_XV):
-        self._verify_tempo_keys(client ,TD_V,TD_X,nonceV,V1,V2,SG_XV)
-        return self._gen_session_keys()
+    def verify_and_gen_session_key(self,client,TD_X,TD_V,V1,V2,N_X,SG_XV):
+        self._verify_tempo_keys(client ,TD_V,TD_X,N_X,V1,V2,SG_XV)
+        return self._gen_session_keys(client,V1,V2,N_X)
     
-    def _verify_tempo_keys(self,client,TD_V,TD_X,nonceV,V1 ,V2,SG_XV):
-        nonceVX = float(nonceV)
+    def _verify_tempo_keys(self,client,TD_V,TD_X,nonceX,V1 ,V2,SG_XV):
+        nonceVX = float(nonceX)
         try:
             assert float(calcNonce()) - nonceVX < 60*5
         except AssertionError:
             raise Exception("Nonce Not Fresh")
-        P_XV = xor(self.S_XV , self.hk_XV)
-        SG_XV_ = hashIT(TD_V,TD_X,nonceV,V1, V2 ,self.data[client].K_XV)
+        SG_XV_ = hashIT(TD_X,TD_V,V1, V2 ,nonceX,self.data[client].K_XV)
         try:
             assert SG_XV == SG_XV_
         except AssertionError:
             raise Exception("Signature Verification Failed")
         
-    def gen_session_key(self,client,TD_V,TD_X,V1,V2,nonceV):
-        hr_X_new = xor(V2,self.hk_XV)
-        hr_X = xor(V1,self.hk_XV)
-        K_S = xor(hr_X , hr_X_new)
+    def _gen_session_keys(self,client,V1,V2,nonceX):
+        hk_XV = hashIT(self.data[client].K_XV,nonceX)
+        hr_X_new = xor(V2,hk_XV)
+        R_X = xor(V1,hk_XV)
+        hr_X = hashIT(R_X)
+        self.K_S = xor(hr_X , hr_X_new)
+        print(self.K_S)
+        self.data[client].HR_X = hr_X_new
+        self.data[client].K_XV = R_X
+        
 
         
         
@@ -161,28 +176,6 @@ class Verifier():
         self.data = vStoreContainer()
         self.verifier_enroll = Verifier_enroll(p,id,self.data)
         self.verifier_dd_ake = Verifier_DD_AKE(self.data)
-        self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.p)
+        self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.p,self.id)
 
-
-
-
-
-
-    """
-    def _gen_tempo_keys(self,client: str,pair_id: str,verifier_id: str,TD_X,TD_V,TD_pair):
-        import hashlib,time
-        nonceVX = str(time.time()).encode()
-        data = self.data[client]
-        datapair = self.data[pair_id]
-        hk_XV = hashlib.sha256(data.K_XV.to_bytes((data.K_XV.bit_length()+7)//8,'big')+nonceVX).digest()
-        hk_YV = hashlib.sha256(datapair.K_XV.to_bytes((datapair.K_XV.bit_length()+7)//8,'big')+nonceVX).digest()
-        t1 = hashlib.sha256(data.K_XV.to_bytes((data.K_XV.bit_length()+7)//8,'big')+nonceVX).digest()
-        t2 = hashlib.sha256(datapair.K_XV.to_bytes((datapair.K_XV.bit_length()+7)//8,'big')+nonceVX).digest()
-        R_p = xor(t1,t2)
-        D_X = xor(data.S_XV.to_bytes((data.S_XV.bit_length()+7)//8,'big'),hk_XV)
-        D_Y = xor(datapair.S_XV.to_bytes((datapair.S_XV.bit_length()+7)//8,'big'),hk_YV)
-        SG_V_X = hashlib.sha256(TD_V+TD_X+D_X+R_p+nonceVX+data.K_XV.to_bytes((data.K_XV.bit_length()+7)//8,'big')).digest()
-        SG_V_Y = hashlib.sha256(TD_V+TD_pair+D_Y+R_p+nonceVX+datapair.K_XV.to_bytes((datapair.K_XV.bit_length()+7)//8,'big')).digest()
-        return (TD_V,TD_X,D_X,R_p,nonceVX,SG_V_X),(TD_V,TD_pair,D_Y,R_p,nonceVX,SG_V_Y)
-    """
 

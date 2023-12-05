@@ -76,7 +76,14 @@ def hashIT(*args) -> bytes:
 
 
 def xor(a,b):
-    return b''.join([bytes([i^j]) for i,j in zip(a,b)])
+    from itertools import cycle
+    if type(a)==int:
+        a = a.to_bytes((a.bit_length()+7)//8,"big")
+    if type(b)==int:
+        b = b.to_bytes((b.bit_length()+7)//8,"big")
+    if len(a) < len(b):
+        a,b = b,a
+    return b''.join([bytes([i^j]) for i,j in zip(a,cycle(b))])
 
 def calcNonce():
     from time import time

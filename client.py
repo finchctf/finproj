@@ -1,10 +1,10 @@
 from helper import *
 class Device_enroll:
-    def __init__(self, p:int ,id:str):
+    def __init__(self, p:int ,id:str,data):
         self.id = id
         self.p = p
         self.puff = PUFF(self.p)
-        self.data = dStore(ID_X=self.id)
+        self.data = data
 
     def get_CX_CXV(self,C_X,C_XV):
         self.C_X, self.C_XV = C_X, C_XV
@@ -83,7 +83,7 @@ class Device_DV_AKE():
         self.data = data
         self.puff = PUFF(self.p)
 
-    def gen_tempo_keys(self,verifier_id: str):
+    def gen_tempo_identity(self,verifier_id: str):
         K_XV = self.puff(self.data.C_XV)
         nonceX = calcNonce()
         hk_XV = hashIT(K_XV,nonceX)
@@ -92,9 +92,9 @@ class Device_DV_AKE():
         Sig_X_V = hashIT(TD_X+TD_V+nonceX,K_XV)
         return TD_X,TD_V,nonceX,Sig_X_V
     
-    def verify_and_gen_session_key(self,TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X):
+    def verify_and_gen_session_key(self,TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X,verifier_id):
         self._verify_tempo_keys(TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X)
-        return self._gen_session_keys(P_XV, P_X , Cl , N_V)
+        return self._gen_session_keys(P_XV, P_X , Cl , N_V,verifier_id)
 
     def _verify_tempo_keys(self,TD_V,TD_X,P_XV, P_X , Cl , N_V , SG_V_X):
         nonceVX = float(N_V)
@@ -104,14 +104,21 @@ class Device_DV_AKE():
             raise Exception("Nonce Not Fresh")
         K_XV = self.puff(self.data.C_XV)
         SG_V_X_ = hashIT(TD_V,TD_X,P_XV, P_X , Cl , N_V,K_XV)
+        #print("*",TD_V,TD_X,P_XV, P_X , Cl , N_V,K_XV,sep="\n")
+
         try:
             assert SG_V_X == SG_V_X_
         except AssertionError:
             raise Exception("Signature Verification Failed")
         
-    def _gen_session_keys(self,client ,P_XV, P_X , Cl , N_V):
-        S_XV = xor(P_XV , self.hk_XV)
-        C_X = (S_XV + 2*self.data.S_X) % self.p
+    def _gen_session_keys(self ,P_XV, P_X , Cl , N_V,verifier_id):
+        K_XV = self.puff(self.data.C_XV)
+        hk_XV = hashIT(K_XV,N_V)
+        #print("*",hk_XV)
+        S_XV = int.from_bytes(xor(P_XV , hk_XV),"big")
+        #print("*",S_XV,P_XV,hk_XV,sep="\n")
+        C_X = (2*self.data.S_X - S_XV ) % self.p
+        #print(C_X)
         H_C_X = hashIT(C_X)
         try:
             assert H_C_X == self.data.HC_X
@@ -120,23 +127,24 @@ class Device_DV_AKE():
         
         R_X = self.puff(C_X)
         hr_X = hashIT(R_X)
-        C_X_new = xor(xor(Cl, self.hk_XV), hr_X)
+        #print(type(Cl),type(hk_XV),type(hr_X),sep="\n")
+        C_X_new = Cl ^ int.from_bytes(hk_XV,"big") ^ int.from_bytes(hr_X,"big")
         R_X_new = self.puff(C_X_new)
-        S_X_new  = xor(P_X , self.hk_XV)
-        hk_XV_new = hashIT(self.K_XV, N_V)
+        S_X_new  = xor(P_X , hk_XV)
+        Nonce_X = calcNonce()
+        hk_XV = hashIT(K_XV, Nonce_X)
         hr_X_new = hashIT(R_X_new)
-        V1 = xor(R_X , self.hk_XV)
-        V2 = xor(hr_X_new ,self.hk_XV)
-        TD_X = hashIT(self.id,self.hk_XV)
-        TD_V = hashIT(self.verifier_id,self.hk_XV)
-        SG_XV = hashIT(TD_X,TD_V, N_V,V1,V2 , self.K_XV)
-        K_S = xor(hr_X , hr_X_new)
-        S_X = S_X_new
-        self.data[client].C_XV = C_X
-        N_X_new  = calcNonce()
-        self.data[client].S_X = S_X_new
-        self.data[client].HC_X = hashIT(C_X_new)
-        return ( TD_X, TD_V , V1 , V2, N_X_new ,SG_XV)
+        V1 = xor(R_X , hk_XV)
+        V2 = xor(hr_X_new ,hk_XV)
+        TD_X = hashIT(self.id,hk_XV)
+        TD_V = hashIT(verifier_id.encode(),hk_XV)
+        SG_XV = hashIT(TD_X,TD_V,V1,V2 ,Nonce_X, K_XV)
+        self.K_S = xor(hr_X , hr_X_new) 
+        self.data.S_X = S_X_new       
+        self.data.C_XV = C_X
+        self.data.HC_X = hashIT(C_X_new)
+        print(self.K_S)
+        return TD_X, TD_V , V1 , V2, Nonce_X ,SG_XV
 
 
         
@@ -144,63 +152,7 @@ class Device_DV_AKE():
 
 class Device():
     def __init__(self, p: int, id: str):
-        self.device_enroll = Device_enroll(p,id)
+        self.data = dStore(ID_X=id)
+        self.device_enroll = Device_enroll(p,id,self.data)
         self.device_dd_ake = Device_DD_AKE(p,id,self.data)
         self.device_dv_ake = Device_DV_AKE(p,id,self.data)
-
-    
-    """    
-    def gen_tempo_keys(self,pair_id: str,verifier_id: str):
-        import hashlib,time
-        self.K_XV = self.R_XV
-        self.nonceX = str(time.time()).encode()
-        self.hk_XV = hashlib.sha256(self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')+self.nonceX).digest()
-        self.TD_X = hashlib.sha256(self.id.encode()+self.hk_XV).digest()
-        self.TD_pair = hashlib.sha256(pair_id.encode()+self.hk_XV).digest()
-        self.TD_V = hashlib.sha256(verifier_id.encode()+self.hk_XV).digest()
-        self.Sig_X_V = hashlib.sha256(self.TD_X+self.TD_V+self.TD_pair+self.nonceX+self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')).digest()
-        return self.TD_X,self.TD_V,self.TD_pair,self.nonceX,self.Sig_X_V
-
-    def verify_and_gen_session_key(self,TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag=True):
-        self._verify_tempo_keys(TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag)
-        return self._gen_session_keys(D_X,nonceV,R_p,flag=True)
-    
-    def _verify_tempo_keys(self,TD_V,TD_X,D_X,R_p,nonceV,SG_V_X,flag=True):
-        import hashlib,time
-        nonceVX = float(nonceV)
-        try:
-            assert float(time.time()) - nonceVX < 60*5
-        except AssertionError:
-            raise Exception("Nonce Not Fresh")
-        if flag:
-            try:
-                assert self.TD_X == TD_X
-            except AssertionError:
-                raise Exception("TD_X Verification Failed")
-        else:
-            self.K_XV = self.R_XV
-            self.hk_XV = hashlib.sha256(self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')+nonceV).digest()
-        SG_V_X_ = hashlib.sha256(TD_V+TD_X+D_X+R_p+nonceV+self.K_XV.to_bytes((self.K_XV.bit_length()+7)//8,'big')).digest()
-        try:
-            assert SG_V_X == SG_V_X_
-        except AssertionError:
-            raise Exception("Signature Verification Failed")
-        
-    def _gen_session_keys(self,D_X,nonceV,R_p,flag=True):
-        import hashlib
-        S_XV = int.from_bytes(xor(D_X,self.hk_XV),'big')
-        #print(S_XV,self.data.S_X)
-        C_X = (S_XV-2*self.data.S_X) % self.p
-        H_C_X = hashlib.sha256(C_X.to_bytes((C_X.bit_length()+7)//8,'big')).digest()
-        try:
-            print(H_C_X,self.data.HC_X,C_X)
-            assert H_C_X == self.data.HC_X
-        except AssertionError:
-            raise Exception("HC_X Verification Failed")
-        
-        R_X = self.puff(C_X)
-        RES_X = hashlib.sha256(hashlib.sha256(R_X.to_bytes((R_X.bit_length()+7)//8,'big')).digest()+nonceV).digest()
-        RES_Y = xor(R_p,RES_X)
-        K_S = hashlib.sha256(RES_X+RES_Y).digest() if flag else hashlib.sha256(RES_Y+RES_X).digest()
-        return K_S
-    """
