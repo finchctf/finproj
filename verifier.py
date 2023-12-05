@@ -125,27 +125,31 @@ class Verifier_DV_AKE():
         Cl = self.C_X_new ^ int.from_bytes(hk_XV,'big') ^ int.from_bytes(hr_X,'big')
         TD_X = hashIT(client.encode(),hk_XV)
         SG_XV = hashIT(TD_V,TD_X,nonceV,P_XV,P_X,Cl,self.data[client].K_XV)
-        return (TD_V,TD_X,nonceV,P_XV,P_X,Cl,SG_XV)
+        return (TD_V,TD_X,nonceV,Cl,SG_XV)
     
     def verify_and_gen_session_key(self,client,TD_X,TD_V,nonceV,V1,V2 , N_X,SG_XV):
-        self._verify_tempo_keys(client ,TD_V,TD_X,nonceV,,SG_XV)
-        return self._gen_session_keys(P_XV,P_X,Cl)
+        self._verify_tempo_keys(client ,TD_V,TD_X,nonceV,V1,V2,SG_XV)
+        return self._gen_session_keys()
     
-    def _verify_tempo_keys(self,client,TD_V,TD_X,nonceV,P_XV,P_X,Cl,SG_XV):
+    def _verify_tempo_keys(self,client,TD_V,TD_X,nonceV,V1 ,V2,SG_XV):
         nonceVX = float(nonceV)
         try:
             assert float(calcNonce()) - nonceVX < 60*5
         except AssertionError:
             raise Exception("Nonce Not Fresh")
-        hk_XV = hashIT(self.data[client].K_XV,nonceV)
-        SG_XV_ = hashIT(TD_V,TD_X,nonceV,P_XV,P_X,Cl,self.data[client].K_XV)
+        P_XV = xor(self.S_XV , self.hk_XV)
+        SG_XV_ = hashIT(TD_V,TD_X,nonceV,V1, V2 ,self.data[client].K_XV)
         try:
             assert SG_XV == SG_XV_
         except AssertionError:
             raise Exception("Signature Verification Failed")
         
-    def gen_session_key(self,client,TD_V,TD_X,nonceV,P_XV,P_X,Cl):
-        fgdg
+    def gen_session_key(self,client,TD_V,TD_X,V1,V2,nonceV):
+        hr_X_new = xor(V2,self.hk_XV)
+        hr_X = xor(V1,self.hk_XV)
+        K_S = xor(hr_X , hr_X_new)
+
+        
         
         
         
