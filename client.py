@@ -75,13 +75,31 @@ class Device_DD_AKE:
        # print("*"*35,RES_Y)
         K_S = hashIT(RES_X,RES_Y) if flag else hashIT(RES_Y,RES_X)
         return K_S
-        
+
+class Device_DV_AKE():
+    def __init__(self,p,id,data):
+        self.p = p
+        self.id = id.encode()
+        self.data = data
+        self.puff = PUFF(self.p)
+
+    def gen_tempo_keys(self,verifier_id: str):
+        K_XV = self.puff(self.data.C_XV)
+        nonceX = calcNonce()
+        hk_XV = hashIT(K_XV,nonceX)
+        TD_X = hashIT(self.id,hk_XV)
+        TD_V = hashIT(verifier_id.encode(),hk_XV)
+        Sig_X_V = hashIT(TD_X+TD_V+nonceX,K_XV)
+        return TD_X,TD_V,nonceX,Sig_X_V
+
+
 
 class Device():
     def __init__(self, p: int, id: str):
         self.device_enroll = Device_enroll(p,id)
         self.data = self.device_enroll.data
         self.device_dd_ake = Device_DD_AKE(p,id,self.data)
+        self.device_dv_ake = Device_DV_AKE(p,id,self.data)
 
     
     """    

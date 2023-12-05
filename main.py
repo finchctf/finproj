@@ -58,6 +58,14 @@ def device_device_ake():
     # print(s1.hex(),s2.hex())
 
 
+def device_verifier_ake():
+
+    # Device A -> Verifier
+    temp_keys_A=dA.device_dv_ake.gen_tempo_keys("V1")
+
+
+    temp_keys_V=verifier.verifier_dv_ake.update_tempo_keys_and_gen("A",*temp_keys_A,"V1")
+    print(temp_keys_V)
 
 
 

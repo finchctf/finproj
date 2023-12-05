@@ -78,7 +78,58 @@ class Verifier_DD_AKE():
         SG_V_Y = hashIT(TD_V,TD_pair,D_Y,R_p,self.N_V,data_pair.K_XV)
         return (TD_V,TD_X,D_X,R_p,self.N_V,SG_V_X),(TD_V,TD_pair,D_Y,R_p,self.N_V,SG_V_Y)
 
- 
+class Verifier_DV_AKE():
+    def __init__(self,data,client,p):
+        self.data = data
+        self.client= client
+        self.p=p
+
+    def update_tempo_keys_and_gen(self,client,TD_X,TD_V,n_X,Sig_X_V,verifier_id):
+        self._update_tempo_keys(client,TD_X,TD_V,n_X,Sig_X_V)
+        self.generate_challenge(client)
+        return self.generate_shares(client,TD_V)
+
+    def _update_tempo_keys(self,client,TD_X,TD_V,n_X,Sig_X_V):
+        data = self.data[client]
+        nonceX = float(n_X)
+        try:
+            assert float(calcNonce()) - nonceX < 60*5
+        except AssertionError:
+            raise Exception("Nonce Not Fresh")
+        Sig_X_V_ = hashIT(TD_X,TD_V,n_X,data.K_XV)
+        try:
+            assert Sig_X_V == Sig_X_V_
+        except AssertionError:
+            raise Exception("Signature Verification Failed")
+
+    def generate_challenge(self,client: str):
+        assert client in self.client
+        #one seed
+        C_X_new = getRand(self.p)
+        self.C_X_new = C_X_new 
+
+    def generate_shares(self,client: str,TD_V:bytes):
+        assert client in self.client
+        R_AND_new = getRand(self.p)
+        s_XV_new = (self.C_X_new + 2 * R_AND_new) % self.p
+        s_X_new = (self.C_X_new + R_AND_new) % self.p
+        # generate nonce V
+        nonceV = calcNonce()
+        # generate hk_XC
+        hk_XV = hashIT(self.data[client].K_XV,nonceV)
+        # retrieves hr_A
+        hr_X = self.data[client].HR_X
+        # generate P_XV =S_XV xor hk_XC
+        P_XV = s_XV_new ^ int.from_bytes(hk_XV,'big')
+        # generate P_X =S_X_NEW xor hk_XC
+        P_X = s_X_new ^ int.from_bytes(hk_XV,'big')
+        # Cl = C_X_new xor hk_XC xor hr_X
+        Cl = self.C_X_new ^ int.from_bytes(hk_XV,'big') ^ int.from_bytes(hr_X,'big')
+        TD_X = hashIT(client.encode(),hk_XV)
+        SG_XV = hashIT(TD_V,TD_X,nonceV,P_XV,P_X,Cl,self.data[client].K_XV)
+        return (TD_V,TD_X,nonceV,P_XV,P_X,Cl,SG_XV)
+    
+
         
 
 class Verifier():
@@ -89,7 +140,9 @@ class Verifier():
         self.data = vStoreContainer()
         self.verifier_enroll = Verifier_enroll(p,id,self.client,self.data)
         self.data = self.verifier_enroll.data
+        self.client = self.verifier_enroll.client
         self.verifier_dd_ake = Verifier_DD_AKE(self.data)
+        self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.client,self.p)
 
 
 
