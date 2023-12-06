@@ -129,7 +129,7 @@ class Verifier_DV_AKE():
         #print("+",self.data[client].S_XV,P_XV,hk_XV,sep="\n")
 
         # generate P_X =S_X_NEW xor hk_XC
-        P_X = xor(s_XV_new_b ,hk_XV)
+        P_X = xor(s_X_new ,hk_XV)
         # Cl = C_X_new xor hk_XC xor hr_X
         Cl = self.C_X_new ^ int.from_bytes(hk_XV,'big') ^ int.from_bytes(hr_X,'big')
         TD_X = hashIT(client.encode(),hk_XV)

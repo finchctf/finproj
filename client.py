@@ -117,6 +117,7 @@ class Device_DV_AKE():
         #print("*",hk_XV)
         S_XV = int.from_bytes(xor(P_XV , hk_XV),"big")
         #print("*",S_XV,P_XV,hk_XV,sep="\n")
+        # print(type(S_XV),type(self.data.S_X),sep="\n")
         C_X = (2*self.data.S_X - S_XV ) % self.p
         #print(C_X)
         H_C_X = hashIT(C_X)
@@ -140,7 +141,7 @@ class Device_DV_AKE():
         TD_V = hashIT(verifier_id.encode(),hk_XV)
         SG_XV = hashIT(TD_X,TD_V,V1,V2 ,Nonce_X, K_XV)
         self.K_S = xor(hr_X , hr_X_new) 
-        self.data.S_X = S_X_new       
+        self.data.S_X = int.from_bytes(S_X_new , "big")      
         self.data.C_XV = C_X
         self.data.HC_X = hashIT(C_X_new)
         print(self.K_S)
