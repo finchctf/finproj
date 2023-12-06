@@ -68,9 +68,9 @@ class PUFF:
 
 
 def hashIT(*args) -> bytes:
-    from hashlib import sha1
+    from hashlib import sha256
     x=b"".join([i if type(i)==bytes else i.to_bytes((i.bit_length()+7)//8,"big") for i in args])
-    return sha1(x).digest()
+    return sha256(x).digest()
     
 
 

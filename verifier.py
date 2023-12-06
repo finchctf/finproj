@@ -111,6 +111,7 @@ class Verifier_DV_AKE():
         assert client in self.data
         R_AND_new = getRand(self.p)
         s_XV_new = (self.C_X_new + 2 * R_AND_new) % self.p
+        self.s_XV_new = s_XV_new
         s_X_new = (self.C_X_new + R_AND_new) % self.p
         # generate nonce V
         nonceV = calcNonce()
@@ -162,7 +163,8 @@ class Verifier_DV_AKE():
         print(self.K_S)
         self.data[client].HR_X = hr_X_new
         self.data[client].K_XV = R_X
-        
+        self.data[client].S_XV = self.s_XV_new
+
 
         
         
