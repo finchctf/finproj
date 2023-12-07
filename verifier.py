@@ -179,5 +179,8 @@ class Verifier():
         self.verifier_enroll = Verifier_enroll(p,id,self.data)
         self.verifier_dd_ake = Verifier_DD_AKE(self.data)
         self.verifier_dv_ake = Verifier_DV_AKE(self.data,self.p,self.id)
-
+        
+    def setup_data(self):
+        for client in self.data:
+            self.verifier_enroll.add_client(client)
 
