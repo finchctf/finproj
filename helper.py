@@ -60,12 +60,33 @@ def getRand(P):
 class PUFF:
     def __init__(self,P):
         self.P = P
+        self.x = self.generate_qpu_output()
 
     def __call__(self,challenge):
         import random
-        random.seed(challenge)
-        return random.randint(2,self.P-1)
+        random.seed(self.x)
+        kk= random.randint(challenge,self.P-1)
+        #print("PUFF: ",challenge,kk)
+        return kk
 
+    def generate_qpu_output(self,qubits=5, measurements=1024):
+
+        from qiskit import QuantumCircuit, Aer, execute
+
+        circuit = QuantumCircuit(qubits, qubits)
+        # Apply Hadamard gates to all qubits to create superposition
+        circuit.h(range(qubits))
+        # Measure all qubits
+        circuit.measure(range(qubits), range(qubits))
+        # Execute the circuit on a simulator
+        simulator = Aer.get_backend('qasm_simulator')
+        result = execute(circuit, simulator, shots=measurements).result()
+        # Get the counts of each outcome
+        counts = result.get_counts(circuit)
+        t=0
+        for key in counts:
+            t+=pow(int(key,2),counts[key])
+        return t
 
 def hashIT(*args) -> bytes:
     from hashlib import sha256
@@ -88,3 +109,53 @@ def xor(a,b):
 def calcNonce():
     from time import time
     return str(time()).encode()
+
+
+
+class Socket:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self._startServer()
+
+    def _startServer(self):
+        import socket
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.bind((self.host, self.port))
+        self.s.listen(5)
+        print("Server Listening")
+
+    def _acceptConnection(self):
+        self.conn, self.addr = self.s.accept()
+        #print("Connected to ", self.addr)
+
+    def _send(self, data):
+        self.conn.sendall(data)
+    
+    def _recv(self):
+        return self.conn.recv(1024)
+    
+    def _close(self):
+        self.conn.close()
+        self.s.close()
+
+class recvSocket:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self._connect()
+
+    def _connect(self):
+        import socket
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.connect((self.host, self.port))
+        #print("Connected to ", self.host, self.port)
+
+    def _send(self, data):
+        self.s.sendall(data)
+    
+    def _recv(self):
+        return self.s.recv(1024)
+    
+    def _close(self):
+        self.s.close()

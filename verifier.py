@@ -160,10 +160,11 @@ class Verifier_DV_AKE():
         R_X = xor(V1,hk_XV)
         hr_X = hashIT(R_X)
         self.K_S = xor(hr_X , hr_X_new)
-        print(self.K_S)
+        #print(self.K_S)
         self.data[client].HR_X = hr_X_new
         self.data[client].K_XV = R_X
         self.data[client].S_XV = self.s_XV_new
+        return self.K_S
 
 
         
@@ -183,4 +184,3 @@ class Verifier():
     def setup_data(self):
         for client in self.data:
             self.verifier_enroll.add_client(client)
-

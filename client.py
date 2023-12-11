@@ -1,9 +1,9 @@
 from helper import *
 class Device_enroll:
-    def __init__(self, p:int ,id:str,data):
+    def __init__(self, p:int ,id:str,data,puff):
         self.id = id
         self.p = p
-        self.puff = PUFF(self.p)
+        self.puff = puff
         self.data = data
 
     def get_CX_CXV(self,C_X,C_XV):
@@ -23,11 +23,11 @@ class Device_enroll:
         self.data = data
 
 class Device_DD_AKE:
-    def __init__(self,p,id,data):
+    def __init__(self,p,id,data,puff):
         self.p = p
         self.id = id.encode()
         self.data = data
-        self.puff = PUFF(self.p)
+        self.puff = puff
 
     def gen_tempo_keys(self,pair_id: str,verifier_id: str):
         K_XV = self.puff(self.data.C_XV)
@@ -77,11 +77,11 @@ class Device_DD_AKE:
         return K_S
 
 class Device_DV_AKE():
-    def __init__(self,p,id,data):
+    def __init__(self,p,id,data,puff):
         self.p = p
         self.id = id.encode()
         self.data = data
-        self.puff = PUFF(self.p)
+        self.puff = puff
 
     def gen_tempo_identity(self,verifier_id: str):
         K_XV = self.puff(self.data.C_XV)
@@ -144,8 +144,8 @@ class Device_DV_AKE():
         self.data.S_X = int.from_bytes(S_X_new , "big")      
         self.data.C_XV = C_X
         self.data.HC_X = hashIT(C_X_new)
-        print(self.K_S)
-        return TD_X, TD_V , V1 , V2, Nonce_X ,SG_XV
+        #print(self.K_S)
+        return (TD_X, TD_V , V1 , V2, Nonce_X ,SG_XV),self.K_S
 
 
         
@@ -154,6 +154,7 @@ class Device_DV_AKE():
 class Device():
     def __init__(self, p: int, id: str):
         self.data = dStore(ID_X=id)
-        self.device_enroll = Device_enroll(p,id,self.data)
-        self.device_dd_ake = Device_DD_AKE(p,id,self.data)
-        self.device_dv_ake = Device_DV_AKE(p,id,self.data)
+        self.puff = PUFF(p)
+        self.device_enroll = Device_enroll(p,id,self.data,self.puff)
+        self.device_dd_ake = Device_DD_AKE(p,id,self.data,self.puff)
+        self.device_dv_ake = Device_DV_AKE(p,id,self.data,self.puff)
