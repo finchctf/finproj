@@ -22,16 +22,19 @@ class DeviceSocket:
         challenges_json = s.recv(1024).decode()
         challenges = json.loads(challenges_json)
         C_X, C_XV = challenges["C_X"], challenges["C_XV"]
+        #print(f"Received challenges from the verifier: {C_X}, {C_XV}")
+        self.device.device_enroll.get_CX_CXV(C_X, C_XV)
 
-        RA, RAV = self.device.device_enroll.get_CX_CXV(C_X, C_XV)
+        RA, RAV = self.device.device_enroll.get_RX_RXV()
         responses = {"RA": RA, "RAV": RAV}
         s.sendall(json.dumps(responses).encode())
 
         print("Sent responses to the verifier.")
 
         message_json = s.recv(1024).decode()
+        #print(f"Received message from the verifier: {message_json}")
         message = json.loads(message_json)
-        self.device.device_enroll.store_vVals(message["ID"], message["s_A"], message["hc_A"], message["CAV"])
+        self.device.device_enroll.store_vVals(message["ID"], message["s_A"], message["hc_A"].encode("latin-1"), message["CAV"])
 
         print("Received message from the verifier.")
 
