@@ -158,15 +158,52 @@ class VerifierSocket(Socket):
             data = data["data"]
             if DEBUG:
                 print("[+] Data: ",data)
-            session_key=self.verifier.verifier_dv_ake.verify_and_gen_session_key(
+            self.session_key=self.verifier.verifier_dv_ake.verify_and_gen_session_key(
                 clientID,data["TD_X"],data["TD_V"],data["V1"],data["V2"],data["nonceX"],data["SG_XV"]
                 )
+
+            msg = input("Enter message: ")
+            from Crypto.Cipher import AES
+            from Crypto.Util.Padding import pad,unpad
+            from Crypto.Random import get_random_bytes
+            import hashlib
+            key = hashlib.sha256(self.session_key).digest()[:32]
+            iv = get_random_bytes(AES.block_size)
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            ct_bytes = cipher.encrypt(pad(msg.encode(), AES.block_size))
+            data = {
+                "verifierID": self.verifier.id,
+                "clientID": clientID,
+                "type": "device_verifier_communication",
+                "data": {
+                    "iv": iv,
+                    "ct": ct_bytes
+                
+                }
+            }
+            self._send(pickle.dumps(data))
+            return True
+        elif data["type"] == "device_verifier_communication":
+            if DEBUG:
+                print(data)
+            data = data["data"]
+            iv = data["iv"]
+            ct = data["ct"]
+            from Crypto.Cipher import AES
+            from Crypto.Util.Padding import pad,unpad
+            from Crypto.Random import get_random_bytes
+            import hashlib
+            key = hashlib.sha256(self.session_key).digest()[:32]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            pt = unpad(cipher.decrypt(ct), AES.block_size)
+            print("Message: ",pt.decode())
             self._send(pickle.dumps({
                 "type": "exit",
                 "code": "success"
             }))
-            print("Success",session_key.hex())
             return False
+        else:
+            print(data)
 
 
 

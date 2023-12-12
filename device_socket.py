@@ -6,6 +6,8 @@ from helper import Socket,recvSocket
 import threading
 
 DEBUG = False
+DEVICE_PORT = 5000
+STOP_THREAD = False
 
 
 class DeviceSocket(Socket):
@@ -18,6 +20,9 @@ class DeviceSocket(Socket):
 
     def loopLogic(self,):
         while True:
+            global STOP_THREAD
+            if STOP_THREAD:
+                return
             try:
                 self._acceptConnection()
                 data = self._recv()
@@ -117,7 +122,42 @@ class DeviceSocket(Socket):
             data["TD_V"],data["TD_X"],data["D_X"],data["R_p"],data["nonceV"],data["SG_V_X"],data["flag"]
         )
         self.recvSoc._close()
-        print("Success",session_key.hex())
+        if DEBUG:
+            print("Success",session_key.hex())
+        
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import pad,unpad
+        import hashlib
+        from Crypto.Random import get_random_bytes
+        self.makeConn(self.pair_ip,DEVICE_PORT)
+        usr_input = input("Enter your message(exit to quit): ")
+        if usr_input == "exit":
+            return
+        iv = get_random_bytes(AES.block_size)
+        key = hashlib.sha256(session_key).digest()[:32]
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        ct_bytes = cipher.encrypt(pad(usr_input.encode(), AES.block_size))
+        data = {
+            "iv": iv,
+            "ct": ct_bytes
+        }
+        data = self.sendRecv("device_device_communication",data)
+        if DEBUG:
+            print("[+]  Data ",data)
+        assert data["type"] == "device_device_communication"
+        data = data["data"]
+        iv = data["iv"]
+        ct = data["ct"]
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        pt = unpad(cipher.decrypt(ct), AES.block_size)
+        print("Message: ",pt.decode())
+        self.recvSoc._close()
+
+
+
+
+
+        
 
     def ddAKE_DY(self,data):
         if DEBUG:
@@ -128,7 +168,38 @@ class DeviceSocket(Socket):
             session_key=self.device.device_dd_ake.verify_and_gen_session_key(
                 data["TD_V"],data["TD_X"],data["D_X"],data["R_p"],data["nonceV"],data["SG_V_X"],data["flag"]
             )
-            print("Success",session_key.hex())
+            if DEBUG:
+                print("Success",session_key.hex())
+            self.session_key = session_key
+            return True
+        elif data["type"] == "device_device_communication":
+            data = data["data"]
+            iv = data["iv"]
+            ct = data["ct"]
+            from Crypto.Cipher import AES
+            from Crypto.Util.Padding import pad,unpad
+            from Crypto.Random import get_random_bytes
+            import hashlib
+            key = hashlib.sha256(self.session_key).digest()[:32]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            pt = unpad(cipher.decrypt(ct), AES.block_size)
+            print("Message: ",pt.decode())
+            msg = input("Enter your message(exit to quit): ")
+            if msg == "exit":
+                return False
+            iv = get_random_bytes(AES.block_size)
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            ct_bytes = cipher.encrypt(pad(msg.encode(), AES.block_size))
+            data = {
+                "iv": iv,
+                "ct": ct_bytes
+            }
+            self._send(pickle.dumps({
+                "type": "device_device_communication",
+                "verifierID": self.verifierID,
+                "clientID": self.device.data.ID_X,
+                "data": data
+            }))
             return False
         raise Exception("Invalid Data")
 
@@ -162,8 +233,35 @@ class DeviceSocket(Socket):
 
         }
         data=self.sendRecv("verifier_dv_ake_verify_and_gen_session_key",data)
+        if DEBUG:
+            print("[+]  Data ",data)
+        assert data["type"] == "device_verifier_communication"
+        data = data["data"]
+        iv = data["iv"]
+        ct = data["ct"]
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import pad,unpad
+        from Crypto.Random import get_random_bytes
+        import hashlib
+        key = hashlib.sha256(session_key).digest()[:32]
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        pt = unpad(cipher.decrypt(ct), AES.block_size)
+        print("Message: ",pt.decode())
+        msg = input("Enter your message(exit to quit): ")
+        if msg == "exit":
+            return False
+        iv = get_random_bytes(AES.block_size)
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        ct_bytes = cipher.encrypt(pad(msg.encode(), AES.block_size))
+        data = {
+            "iv": iv,
+            "ct": ct_bytes
+        }
+        self.sendRecv("device_verifier_communication", data
+        )
         self.recvSoc._close()
-        print("Success",session_key.hex())
+        if DEBUG:
+            print("Success",session_key.hex())
 
 
 
@@ -183,10 +281,16 @@ class DeviceSocket(Socket):
                 device.dvAKE_init(verifier_ip,verifier_port)
             elif k == "0":
                 exitt = True
+                #kill parent thread
+                import os
+                import signal
+                os.kill(os.getpid(), signal.SIGINT)
+                global STOP_THREAD
+                STOP_THREAD = True
             else:
                 print("Invalid Choice")
             k=input("Enter your choice\n")
-        device.conn.close()
+        #self.conn.close()
 
 
 
@@ -209,8 +313,9 @@ if __name__ == "__main__":
     thread2 = threading.Thread(target=device.handleThread,args=(verifier_ip,verifier_port))
     thread2.start()
     thread2.join()
+    STOP_THREAD = True
     #force kill thread1
-    thread1._stop()
+    thread1.join(0.1)
     exit(0)
 
 
